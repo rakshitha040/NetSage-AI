@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='2' width='20' height='8' rx='2'/><rect x='2' y='14' width='20' height='8' rx='2'/><line x1='6' y1='6' x2='6.01' y2='6'/><line x1='6' y1='18' x2='6.01' y2='18'/></svg>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetSage AI - Cisco Network Troubleshooting & Human Review</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Fira Code', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Lucide Icons & Chart.js & Confetti CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <style>
+    /* Custom scrollbar for terminals */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .badge-sample {
+      background-color: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+    .badge-experiment {
+      background-color: #ede9fe;
+      color: #5b21b6;
+      border: 1px solid #ddd6fe;
+    }
+  </style>
+</head>
+<body class="bg-[#f8fafc] text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-blue-100 selection:text-blue-900">
+
+  <!-- TOP NAVBAR -->
+  <header class="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand & Tabs -->
+      <div class="flex items-center gap-6">
+        <a href="#" onclick="switchView('workbench'); return false;" class="flex items-center gap-2.5 group">
+          <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white shadow-xs group-hover:bg-blue-700 transition-colors">
+            <i data-lucide="network" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-base font-bold tracking-tight text-slate-900 font-mono">
+                NetSage<span class="text-blue-600">.AI</span>
+              </span>
+              <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase font-mono">
+                Cisco Labs
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-500 hidden sm:block">
+              AI Troubleshooting Assistant with Mandatory Human Review
+            </p>
+          </div>
+        </a>
+
+        <!-- Nav Tabs -->
+        <nav class="flex items-center gap-1">
+          <button
+            id="tab-workbench"
+            onclick="switchView('workbench')"
+            class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold font-mono transition-all bg-blue-50 text-blue-700 border border-blue-200 shadow-xs"
+          >
+            <i data-lucide="sparkles" class="w-4 h-4 text-blue-600"></i>
+            <span>Diagnostic Workbench</span>
+          </button>
+
+          <button
+            id="tab-analytics"
+            onclick="switchView('analytics')"
+            class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold font-mono transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          >
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-blue-600"></i>
+            <span>Analytics & Audit Report</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Right Status & Actions -->
+      <div class="flex items-center gap-2.5">
+        <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>Human Review Required</span>
+        </div>
+
+        <button
+          onclick="openImportModal()"
+          title="Import cases from CSV"
+          class="flex items-center gap-1.5 text-xs font-mono font-semibold text-slate-700 bg-white hover:bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-300 transition-colors shadow-xs"
+        >
+          <i data-lucide="upload" class="w-3.5 h-3.5 text-blue-600"></i>
+          <span class="hidden sm:inline">Import CSV</span>
+        </button>
+
+        <button
+          onclick="handleResetDefaults()"
+          title="Reset database to initial defaults"
+          class="flex items-center gap-1 text-xs font-mono text-slate-500 hover:text-slate-900 p-1.5 rounded-md hover:bg-slate-100 transition-colors border border-slate-200"
+        >
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Reset</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: DIAGNOSTIC & REVIEW WORKBENCH -->
+    <!-- ========================================== -->
+    <div id="view-workbench" class="space-y-6">
+      <!-- Workbench Top Card -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold font-mono text-slate-900">
+              Diagnostic & Review Workbench
+            </h1>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono">
+              Custom Troubleshooting
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Submit custom Packet Tracer symptoms and Cisco `show` outputs, inspect deterministic checks, generate AI recommendations, and record mandatory human review decisions.
+          </p>
+        </div>
+
+        <!-- Quick Preloader Dropdown -->
+        <div class="flex items-center gap-2 font-mono text-xs">
+          <label for="preloader-select" class="text-slate-500 font-semibold whitespace-nowrap">Load Lab Case:</label>
+          <select
+            id="preloader-select"
+            onchange="handleLoadCase(this.value)"
+            class="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 text-xs font-mono focus:bg-white focus:outline-none focus:border-blue-500 max-w-xs"
+          >
+            <option value="">-- Select Lab Scenario --</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Success Notification Alert -->
+      <div id="success-toast" class="hidden p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 font-mono text-xs flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600 shrink-0"></i>
+          <span id="success-toast-msg">Decision recorded successfully! Logged to Audit Report.</span>
+        </div>
+        <button
+          onclick="switchView('analytics')"
+          class="text-xs font-semibold underline text-emerald-700 hover:text-emerald-900 ml-4 flex items-center gap-1"
+        >
+          <span>View in Analytics & Report</span>
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+
+      <!-- Compact Safety Notice Banner -->
+      <div class="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-900 font-mono text-xs flex items-start gap-3">
+        <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+        <div class="leading-relaxed">
+          <strong class="font-bold text-amber-950">Mandatory Human Review Protocol:</strong> AI outputs are advisory recommendations only. Fixes are never applied automatically to devices and cannot be marked verified without explicit human confirmation.
+        </div>
+      </div>
+
+      <!-- Main 2-Column Responsive Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left Column: Custom Input Form (5 cols) -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <i data-lucide="terminal" class="w-4 h-4 text-blue-600"></i>
+                Custom Network Telemetry
+              </h2>
+              <span id="case-source-badge" class="hidden text-[10px] font-bold px-1.5 py-0.2 rounded font-mono"></span>
+            </div>
+
+            <!-- Case ID & Issue Type -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-1">
+                <label class="text-xs font-mono font-semibold text-slate-700 block">Case Identifier:</label>
+                <input
+                  type="text"
+                  id="input-case-id"
+                  value="CUSTOM-LAB-01"
+                  placeholder="e.g. CASE-101"
+                  class="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div class="space-y-1">
+                <label class="text-xs font-mono font-semibold text-slate-700 block">Fault Domain:</label>
+                <select
+                  id="input-issue-type"
+                  class="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
+                >
+                  <option value="VLAN">VLAN</option>
+                  <option value="Gateway">Gateway</option>
+                  <option value="DHCP">DHCP</option>
+                  <option value="DNS">DNS</option>
+                  <option value="Routing">Routing</option>
+                  <option value="ACL">ACL</option>
+                  <option value="NAT">NAT</option>
+                  <option value="Wireless">Wireless</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Topology Note -->
+            <div class="space-y-1">
+              <label class="text-xs font-mono font-semibold text-slate-700 block">
+                1. Topology & Device Context:
+              </label>
+              <textarea
+                id="input-topology"
+                placeholder="e.g. Switch-A (Gi0/1) connected to Switch-B (Gi0/1) with VLAN 10 and VLAN 99..."
+                rows="2"
+                class="w-full p-2.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-mono text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              ></textarea>
+            </div>
+
+            <!-- Symptom -->
+            <div class="space-y-1">
+              <label class="text-xs font-mono font-semibold text-slate-700 block">
+                2. Reported Symptom:
+              </label>
+              <textarea
+                id="input-symptom"
+                placeholder="e.g. PC gets IP address but cannot reach server in VLAN 30; gateway ping works..."
+                rows="2"
+                class="w-full p-2.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-mono text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              ></textarea>
+            </div>
+
+            <!-- Show Outputs -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-mono font-semibold text-slate-700">
+                  3. Cisco CLI Show-Command Outputs:
+                </label>
+                <span class="text-[10px] font-mono text-slate-400">
+                  show ip route, vlan, acl, etc.
+                </span>
+              </div>
+              <textarea
+                id="input-show-outputs"
+                placeholder="Paste outputs from show ip interface brief, show vlan brief, show ip route, show access-lists, syslog..."
+                rows="8"
+                class="w-full p-2.5 rounded-lg bg-slate-900 text-slate-100 border border-slate-700 font-mono text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 leading-relaxed"
+              ></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="pt-2 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                id="btn-run-rules"
+                onclick="handleRunRules()"
+                class="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono text-xs font-semibold border border-slate-300 transition-all cursor-pointer"
+              >
+                <i data-lucide="code-2" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span>Run Rule Checks</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-generate-ai"
+                onclick="handleGenerateAI()"
+                class="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-mono text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>Generate AI Diagnosis</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Rule Findings + AI Recommendation + Mandatory Review (7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          
+          <!-- Loading Spinner Box -->
+          <div id="loading-spinner" class="hidden bg-white p-8 rounded-xl border border-slate-200 shadow-xs text-center space-y-3">
+            <div class="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p id="loading-label" class="text-xs font-mono text-slate-600 font-semibold">Processing network telemetry...</p>
+          </div>
+
+          <!-- Initial Blank State Helper -->
+          <div id="blank-state" class="bg-white p-10 rounded-xl border border-dashed border-slate-300 text-center space-y-2 shadow-xs">
+            <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+              <i data-lucide="sparkles" class="w-5 h-5"></i>
+            </div>
+            <h3 class="text-sm font-bold font-mono text-slate-800">
+              Diagnostic Output Panel
+            </h3>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+              Enter custom network telemetry on the left or select a preloaded case, then click <strong>"Run Rule Checks"</strong> or <strong>"Generate AI Diagnosis"</strong> to evaluate the fault and begin human review.
+            </p>
+          </div>
+
+          <!-- 1. Deterministic Rule Findings Card -->
+          <div id="rule-findings-card" class="hidden bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <i data-lucide="code-2" class="w-4 h-4 text-amber-600"></i>
+                <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-slate-800">
+                  Deterministic Rule Findings
+                </h3>
+              </div>
+              <span id="rule-findings-count" class="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold">
+                0 Rule(s) Matched
+              </span>
+            </div>
+
+            <div id="rule-findings-list" class="space-y-2.5">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- 2. AI Recommendation Proposal Card -->
+          <div id="ai-diagnosis-card" class="hidden bg-white p-5 rounded-xl border border-blue-200 shadow-xs space-y-4">
+            <!-- Header -->
+            <div class="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2.5">
+                <div class="p-2 rounded-lg bg-blue-50 text-blue-600 border border-blue-200">
+                  <i data-lucide="sparkles" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-bold font-mono text-slate-900">
+                      AI Diagnostic Recommendation
+                    </h3>
+                    <span id="diag-sample-badge" class="text-[10px] font-bold px-1.5 py-0.2 rounded badge-sample font-mono">
+                      sample AI recommendation
+                    </span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 font-mono">
+                    Candidate recommendation awaiting mandatory human review
+                  </p>
+                </div>
+              </div>
+
+              <!-- Confidence -->
+              <div class="text-right font-mono">
+                <span id="diag-confidence-badge" class="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                  Confidence: High (92%)
+                </span>
+              </div>
+            </div>
+
+            <!-- Probable Root Cause -->
+            <div class="space-y-1 font-mono text-xs">
+              <span class="text-slate-500 font-semibold uppercase text-[11px]">
+                Probable Root Cause:
+              </span>
+              <div id="diag-root-cause" class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 leading-relaxed font-sans text-xs">
+                <!-- Text here -->
+              </div>
+            </div>
+
+            <!-- Fault Layer & Recommended Next Command -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <span class="text-[11px] text-slate-500 font-semibold block">Fault Layer:</span>
+                <span id="diag-osi-layer" class="text-slate-800 font-bold">Layer 2 (Data Link)</span>
+              </div>
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <span class="text-[11px] text-slate-500 font-semibold block">Recommended Next Command:</span>
+                <div class="flex items-center justify-between mt-0.5">
+                  <code id="diag-next-cmd" class="text-blue-700 font-bold">show interfaces trunk</code>
+                  <button
+                    type="button"
+                    onclick="copyToClipboard(document.getElementById('diag-next-cmd').innerText, 'cmd-copy-btn')"
+                    id="cmd-copy-btn"
+                    class="text-[10px] text-slate-500 hover:text-blue-600 flex items-center gap-1 cursor-pointer"
+                  >
+                    <i data-lucide="copy" class="w-3 h-3"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Evidence Cited -->
+            <div id="diag-evidence-container" class="space-y-1 font-mono text-xs">
+              <span class="text-slate-500 font-semibold uppercase text-[11px]">
+                Evidence Cited from Outputs:
+              </span>
+              <div id="diag-evidence-list" class="space-y-1">
+                <!-- Evidence blocks -->
+              </div>
+            </div>
+
+            <!-- Suggested Fix Script -->
+            <div class="space-y-1 font-mono text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500 font-semibold uppercase text-[11px]">
+                  Suggested Cisco IOS Fix:
+                </span>
+                <button
+                  type="button"
+                  id="fix-copy-btn"
+                  onclick="copyToClipboard(document.getElementById('diag-fix-code').innerText, 'fix-copy-btn')"
+                  class="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  <span>Copy Script</span>
+                </button>
+              </div>
+              <pre id="diag-fix-code" class="p-3 rounded-lg bg-slate-900 text-emerald-300 font-mono text-xs overflow-x-auto whitespace-pre leading-relaxed border border-slate-800"></pre>
+            </div>
+
+            <!-- Mandatory Safety Warning -->
+            <div class="p-2.5 rounded-lg bg-red-50/70 border border-red-200 text-red-900 font-mono text-[11px] flex items-center gap-2">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-red-600 shrink-0"></i>
+              <span><strong>Warning:</strong> Human review is required before applying any fix. AI outputs are recommendations, never confirmed facts.</span>
+            </div>
+
+            <!-- 3. Mandatory Human Review Panel -->
+            <form id="review-form" onsubmit="handleSaveReview(event)" class="pt-3 border-t border-slate-200 space-y-4 font-mono text-xs">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <i data-lucide="user" class="w-4 h-4 text-blue-600"></i>
+                  Mandatory Human Review Decision
+                </h4>
+                <span class="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-semibold">
+                  * Required Action
+                </span>
+              </div>
+
+              <!-- Validation Error Box -->
+              <div id="review-validation-error" class="hidden p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 font-mono text-xs flex items-center gap-2">
+                <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 text-red-600"></i>
+                <span id="review-validation-msg">Please select a decision.</span>
+              </div>
+
+              <!-- Decision Buttons (Accept, Edit, Reject) -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  id="btn-dec-accept"
+                  onclick="selectDecision('accepted')"
+                  class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-mono text-xs font-bold border bg-white text-slate-700 border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+                  <span>Accept AI Fix</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-dec-edit"
+                  onclick="selectDecision('edited')"
+                  class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-mono text-xs font-bold border bg-white text-slate-700 border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  <i data-lucide="edit-3" class="w-4 h-4 text-blue-600"></i>
+                  <span>Edit / Correct</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-dec-reject"
+                  onclick="selectDecision('rejected')"
+                  class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-mono text-xs font-bold border bg-white text-slate-700 border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  <i data-lucide="x-circle" class="w-4 h-4 text-rose-600"></i>
+                  <span>Reject Proposal</span>
+                </button>
+              </div>
+
+              <!-- Conditional Edit Fields (Only visible when Edited is selected) -->
+              <div id="edit-fields-container" class="hidden space-y-3 p-3.5 rounded-lg bg-blue-50/40 border border-blue-200">
+                <div class="space-y-1">
+                  <label class="text-slate-800 font-semibold flex items-center justify-between">
+                    <span>Corrected Root Cause:</span>
+                    <span class="text-blue-600 text-[10px] font-bold">Mandatory on Edit</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="input-corrected-root-cause"
+                    placeholder="Document the exact actual root cause..."
+                    class="w-full p-2 rounded-lg bg-white border border-slate-300 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div class="space-y-1">
+                  <label class="text-slate-800 font-semibold flex items-center justify-between">
+                    <span>Corrected Cisco IOS Script:</span>
+                    <span class="text-blue-600 text-[10px] font-bold">Human Correction</span>
+                  </label>
+                  <textarea
+                    id="input-corrected-fix"
+                    rows="4"
+                    class="w-full p-2.5 rounded-lg bg-slate-900 text-emerald-300 font-mono text-xs border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
+                  ></textarea>
+                </div>
+              </div>
+
+              <!-- Reviewer Notes (Mandatory) -->
+              <div class="space-y-1">
+                <label class="text-slate-700 font-semibold block">
+                  Reviewer Rationale & Audit Notes (Mandatory):
+                </label>
+                <textarea
+                  id="input-reviewer-notes"
+                  placeholder="Document why you accepted, corrected, or rejected the AI output (e.g. 'Verified native VLAN 99 mismatch in CDP log')..."
+                  rows="2"
+                  class="w-full p-2.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-sans text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                ></textarea>
+              </div>
+
+              <!-- Verification State & Reviewer Identity -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="space-y-1">
+                  <label class="text-slate-700 font-semibold">
+                    Lab Verification State:
+                  </label>
+                  <select
+                    id="input-verification-status"
+                    class="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="verified">Verified (Ping & show commands passed)</option>
+                    <option value="fix_applied">Fix applied in Packet Tracer</option>
+                    <option value="not_tested">Not tested (Draft)</option>
+                    <option value="failed_verification">Failed verification (Issue persists)</option>
+                  </select>
+                </div>
+
+                <div class="space-y-1">
+                  <label class="text-slate-700 font-semibold">
+                    Reviewer Identity:
+                  </label>
+                  <input
+                    type="text"
+                    id="input-reviewer-name"
+                    value="Alex Chen (Lead NetOps)"
+                    placeholder="e.g. Alex Chen (Lead NetOps)"
+                    class="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <!-- Submit Button -->
+              <div class="pt-2">
+                <button
+                  type="submit"
+                  id="btn-submit-review"
+                  class="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-mono font-bold text-xs transition-all shadow-sm cursor-pointer"
+                >
+                  <i data-lucide="save" class="w-4 h-4"></i>
+                  <span>Record Human Decision & Log to Audit Report</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 2: DATA ANALYTICS & AUDIT REPORT -->
+    <!-- ========================================== -->
+    <div id="view-analytics" class="hidden space-y-6">
+      
+      <!-- Top Header & Export Buttons -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold font-mono text-slate-900">
+              Data Analytics Dashboard & Audit Report
+            </h1>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono">
+              Audited Ledger
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Diagnostic statistics, AI vs Human agreement metrics, and immutable review reports.
+          </p>
+        </div>
+
+        <!-- Export Action Buttons -->
+        <div class="flex items-center gap-2">
+          <a
+            href="/api/export/audit-report.csv"
+            download="netsage_audit_report.csv"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-mono font-semibold transition-colors shadow-xs"
+          >
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Audit Report CSV</span>
+          </a>
+
+          <a
+            href="/api/export/cases.csv"
+            download="cases.csv"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-mono font-semibold transition-colors shadow-xs"
+          >
+            <i data-lucide="download" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span>cases.csv</span>
+          </a>
+
+          <a
+            href="/api/export/audit-report.json"
+            download="netsage_audit_report.json"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-mono font-semibold transition-colors shadow-xs"
+          >
+            <i data-lucide="file-json" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>JSON</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 4 KPI Metric Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Total Cases -->
+        <div class="p-5 rounded-xl bg-white border border-slate-200/80 shadow-xs space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-slate-500 uppercase">Total Lab Cases</span>
+            <div class="p-2 rounded-lg bg-blue-50 text-blue-600">
+              <i data-lucide="folder-kanban" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-total-cases" class="text-2xl font-bold font-mono text-slate-900">0</div>
+          <p id="kpi-cases-sub" class="text-[11px] text-slate-500 font-mono">0 sample / 0 experiment</p>
+        </div>
+
+        <!-- Human Agreement Rate -->
+        <div class="p-5 rounded-xl bg-white border border-slate-200/80 shadow-xs space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-slate-500 uppercase">Human Agreement Rate</span>
+            <div class="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+              <i data-lucide="percent" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-agreement-rate" class="text-2xl font-bold font-mono text-slate-900">100%</div>
+          <p id="kpi-agreement-sub" class="text-[11px] text-slate-500 font-mono">0 accepted / 0 reviews</p>
+        </div>
+
+        <!-- Verified Fixes -->
+        <div class="p-5 rounded-xl bg-white border border-slate-200/80 shadow-xs space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-slate-500 uppercase">Verified Lab Fixes</span>
+            <div class="p-2 rounded-lg bg-cyan-50 text-cyan-600">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-verified-fixes" class="text-2xl font-bold font-mono text-slate-900">0</div>
+          <p class="text-[11px] text-slate-500 font-mono">Tested & verified by humans</p>
+        </div>
+
+        <!-- Human AI Corrections -->
+        <div class="p-5 rounded-xl bg-white border border-slate-200/80 shadow-xs space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-slate-500 uppercase">Human AI Corrections</span>
+            <div class="p-2 rounded-lg bg-rose-50 text-rose-600">
+              <i data-lucide="shield-alert" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-corrections-count" class="text-2xl font-bold font-mono text-slate-900">0</div>
+          <p class="text-[11px] text-slate-500 font-mono">Engineers caught AI errors</p>
+        </div>
+      </div>
+
+      <!-- Charts Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Fault Domain Bar Chart -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-blue-600"></i>
+                Network Fault Domain Distribution
+              </h3>
+              <p class="text-xs text-slate-500">Case coverage across networking problem categories</p>
+            </div>
+            <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+              Active Domains
+            </span>
+          </div>
+          <div class="h-56 w-full relative">
+            <canvas id="domainChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Human Decision Breakdown -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div>
+            <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2 mb-1">
+              <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+              Human Decision Breakdown
+            </h3>
+            <p class="text-xs text-slate-500 mb-4">Engineer oversight results on AI candidate suggestions</p>
+
+            <div class="space-y-3 font-mono text-xs">
+              <!-- Accepted -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-slate-700">
+                  <span class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                    Accepted as Is
+                  </span>
+                  <span id="stat-accepted-val" class="font-bold text-slate-900">0 (0%)</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                  <div id="bar-accepted" class="h-full rounded-full bg-emerald-600 transition-all duration-500" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <!-- Human Edited -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-slate-700">
+                  <span class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                    Human Edited
+                  </span>
+                  <span id="stat-edited-val" class="font-bold text-slate-900">0 (0%)</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                  <div id="bar-edited" class="h-full rounded-full bg-blue-600 transition-all duration-500" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <!-- AI Rejected -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-slate-700">
+                  <span class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+                    AI Rejected
+                  </span>
+                  <span id="stat-rejected-val" class="font-bold text-slate-900">0 (0%)</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                  <div id="bar-rejected" class="h-full rounded-full bg-rose-600 transition-all duration-500" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 rounded-lg bg-blue-50/60 border border-blue-100 text-[11px] font-mono text-blue-900 space-y-0.5">
+            <strong>Human Oversight Protocol:</strong>
+            <p id="oversight-summary-text" class="text-blue-800">
+              0 AI suggestions corrected by human reviewers in the live ledger.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Responsible AI Banner -->
+      <div class="bg-gradient-to-r from-blue-50 via-white to-indigo-50/40 p-5 rounded-xl border border-blue-200 shadow-xs space-y-2 font-mono">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-4 h-4 text-blue-600"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-900">
+              Responsible AI Metric: Human Oversight & Audited Corrections
+            </h3>
+          </div>
+          <button
+            id="btn-toggle-corrections"
+            onclick="toggleFilterCorrections()"
+            class="text-xs font-semibold px-2.5 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
+          >
+            Filter AI Corrections
+          </button>
+        </div>
+        <p class="text-xs text-slate-600 font-sans leading-relaxed">
+          The table below tracks cases where human network engineers validated or corrected AI recommendations (e.g. inverted ACL wildcard masks, missing passive interfaces, and rogue MAC ARP collisions).
+        </p>
+      </div>
+
+      <!-- Filter & Search Toolbar -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between font-mono text-xs">
+        <div class="relative w-full md:w-80">
+          <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+          <input
+            type="text"
+            id="audit-search-input"
+            oninput="handleAuditFilterChange()"
+            placeholder="Search report by Case ID, reviewer, note..."
+            class="w-full pl-9 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <select
+            id="audit-decision-filter"
+            onchange="handleAuditFilterChange()"
+            class="px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:outline-none focus:border-blue-500"
+          >
+            <option value="ALL">All Review Decisions</option>
+            <option value="Accepted">Accepted as Is</option>
+            <option value="Edited">Human Edited</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Audit Report Ledger List -->
+      <div id="audit-list" class="space-y-3">
+        <!-- Dynamically populated rows -->
+      </div>
+
+      <!-- Audit Report Empty State -->
+      <div id="audit-empty-state" class="hidden bg-white p-10 rounded-xl border border-dashed border-slate-300 text-center space-y-2">
+        <i data-lucide="file-question" class="w-8 h-8 text-slate-400 mx-auto"></i>
+        <h3 class="text-sm font-bold font-mono text-slate-800">No Audit Records Found</h3>
+        <p class="text-xs text-slate-500">No review records match your selected filter criteria or no diagnoses have been reviewed yet.</p>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- CSV IMPORT MODAL -->
+  <div id="import-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4 font-mono text-xs animate-in fade-in">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <i data-lucide="upload" class="w-4 h-4 text-blue-600"></i>
+          <h3 class="text-sm font-bold text-slate-900 uppercase">Import Packet Tracer Cases (CSV)</h3>
+        </div>
+        <button onclick="closeImportModal()" class="text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-slate-600 font-sans text-xs">
+        Upload a valid CSV file containing lab cases. Imported cases default to <span class="px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 font-mono text-[10px] font-bold">experiment</span> status.
+      </p>
+
+      <div class="p-2.5 rounded bg-slate-50 border border-slate-200 text-[10px] text-slate-500 space-y-1">
+        <strong>Required Headers:</strong>
+        <div class="overflow-x-auto text-slate-700">
+          <code>case_id, issue_type, topology_note, symptom, show_outputs, expected_fault, osi_layer, concept, severity, expected_next_command, expected_fix</code>
+        </div>
+      </div>
+
+      <!-- File Input -->
+      <div class="space-y-1">
+        <label class="text-slate-700 font-semibold block">Select CSV File:</label>
+        <input
+          type="file"
+          id="csv-file-input"
+          accept=".csv,text/csv"
+          class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+        />
+      </div>
+
+      <!-- Raw CSV Text Area (Alternative) -->
+      <div class="space-y-1">
+        <label class="text-slate-700 font-semibold block">Or Paste CSV Text:</label>
+        <textarea
+          id="csv-text-input"
+          rows="4"
+          placeholder="Paste raw CSV with header row..."
+          class="w-full p-2 rounded-lg bg-slate-900 text-slate-200 text-[11px] border border-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+        ></textarea>
+      </div>
+
+      <!-- Import Result / Error Box -->
+      <div id="import-feedback" class="hidden p-3 rounded-lg text-xs"></div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <button
+          type="button"
+          onclick="closeImportModal()"
+          class="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          id="btn-do-import"
+          onclick="handleExecuteImport()"
+          class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-xs cursor-pointer"
+        >
+          <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+          <span>Import Cases</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APP LOGIC -->
+  <script>
+    // --- STATE ---
+    let currentView = 'workbench';
+    let loadedCases = [];
+    let currentDiagnosis = null;
+    let selectedDecisionValue = '';
+    let filterOnlyCorrections = false;
+    let expandedAuditId = null;
+    let domainChartInstance = null;
+
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      await loadCasesList();
+      await loadDashboardStats();
+    });
+
+    // --- VIEW SWITCHER ---
+    function switchView(viewName) {
+      currentView = viewName;
+      const tabW = document.getElementById('tab-workbench');
+      const tabA = document.getElementById('tab-analytics');
+      const viewW = document.getElementById('view-workbench');
+      const viewA = document.getElementById('view-analytics');
+
+      if (viewName === 'workbench') {
+        tabW.className = "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold font-mono transition-all bg-blue-50 text-blue-700 border border-blue-200 shadow-xs";
+        tabA.className = "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold font-mono transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100";
+        viewW.classList.remove('hidden');
+        viewA.classList.add('hidden');
+      } else {
+        tabA.className = "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold font-mono transition-all bg-blue-50 text-blue-700 border border-blue-200 shadow-xs";
+        tabW.className = "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold font-mono transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100";
+        viewA.classList.remove('hidden');
+        viewW.classList.add('hidden');
+        loadDashboardStats();
+        loadAuditLog();
+      }
+      lucide.createIcons();
+    }
+
+    // --- CASE PRELOADER ---
+    async function loadCasesList() {
+      try {
+        const res = await fetch('/api/cases');
+        if (!res.ok) throw new Error('Failed to fetch cases');
+        loadedCases = await res.json();
+
+        const select = document.getElementById('preloader-select');
+        select.innerHTML = '<option value="">-- Select Lab Scenario --</option>';
+
+        loadedCases.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.case_id;
+          const statusTag = c.source_status === 'sample' ? '[SAMPLE]' : '[EXPERIMENT]';
+          opt.textContent = `${statusTag} ${c.case_id}: ${c.concept || c.issue_type} (${c.severity})`;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        console.error('Error loading cases:', err);
+      }
+    }
+
+    function handleLoadCase(caseId) {
+      if (!caseId) return;
+      const targetCase = loadedCases.find(c => c.case_id === caseId);
+      if (!targetCase) return;
+
+      document.getElementById('input-case-id').value = targetCase.case_id;
+      document.getElementById('input-issue-type').value = targetCase.issue_type;
+      document.getElementById('input-topology').value = targetCase.topology_note || '';
+      document.getElementById('input-symptom').value = targetCase.symptom || '';
+      document.getElementById('input-show-outputs').value = targetCase.show_outputs || '';
+
+      const badge = document.getElementById('case-source-badge');
+      badge.classList.remove('hidden');
+      if (targetCase.source_status === 'sample') {
+        badge.className = "text-[10px] font-bold px-1.5 py-0.2 rounded font-mono badge-sample";
+        badge.textContent = "SAMPLE CASE";
+      } else {
+        badge.className = "text-[10px] font-bold px-1.5 py-0.2 rounded font-mono badge-experiment";
+        badge.textContent = "EXPERIMENT CASE";
+      }
+    }
+
+    // --- RUN RULES & AI DIAGNOSIS ---
+    async function handleRunRules() {
+      const showOutputs = document.getElementById('input-show-outputs').value;
+      const symptom = document.getElementById('input-symptom').value;
+      const topology = document.getElementById('input-topology').value;
+      const caseId = document.getElementById('input-case-id').value;
+
+      if (!showOutputs.trim()) {
+        alert('Please paste Cisco CLI show-command outputs before running rule checks.');
+        return;
+      }
+
+      showLoading(true, 'Evaluating deterministic configuration rules on submitted outputs...');
+      try {
+        const payload = {
+          case_id: caseId || undefined,
+          topology_note: topology,
+          symptom: symptom || 'Unspecified symptom',
+          show_outputs: showOutputs
+        };
+
+        const res = await fetch('/api/diagnoses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error('Rule diagnosis request failed');
+        const diag = await res.json();
+        currentDiagnosis = diag;
+
+        renderRuleFindings(diag.rule_findings || []);
+        document.getElementById('rule-findings-card').classList.remove('hidden');
+        document.getElementById('blank-state').classList.add('hidden');
+      } catch (err) {
+        alert('Error running deterministic rules: ' + err.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    async function handleGenerateAI() {
+      const showOutputs = document.getElementById('input-show-outputs').value;
+      const symptom = document.getElementById('input-symptom').value;
+      const topology = document.getElementById('input-topology').value;
+      const caseId = document.getElementById('input-case-id').value;
+
+      if (!showOutputs.trim()) {
+        alert('Please paste Cisco CLI show-command outputs before generating AI diagnosis.');
+        return;
+      }
+
+      showLoading(true, 'AI reasoning engine evaluating Cisco CLI telemetry...');
+      try {
+        const payload = {
+          case_id: caseId || undefined,
+          topology_note: topology,
+          symptom: symptom || 'Unspecified symptom',
+          show_outputs: showOutputs
+        };
+
+        const res = await fetch('/api/diagnoses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error('AI diagnosis request failed');
+        const diag = await res.json();
+        currentDiagnosis = diag;
+
+        renderRuleFindings(diag.rule_findings || []);
+        renderAIDiagnosis(diag);
+
+        document.getElementById('rule-findings-card').classList.remove('hidden');
+        document.getElementById('ai-diagnosis-card').classList.remove('hidden');
+        document.getElementById('blank-state').classList.add('hidden');
+
+        // Reset review form
+        selectDecision('');
+        document.getElementById('input-reviewer-notes').value = '';
+        document.getElementById('input-corrected-fix').value = diag.suggested_fix || '';
+        document.getElementById('input-corrected-root-cause').value = diag.probable_root_cause || '';
+      } catch (err) {
+        alert('Error generating diagnosis: ' + err.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    function renderRuleFindings(findings) {
+      const countBadge = document.getElementById('rule-findings-count');
+      countBadge.textContent = `${findings.length} Rule(s) Matched`;
+
+      const list = document.getElementById('rule-findings-list');
+      list.innerHTML = '';
+
+      if (findings.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-500 font-mono">No deterministic syntax errors detected.</p>';
+        return;
+      }
+
+      findings.forEach(f => {
+        const item = document.createElement('div');
+        item.className = "p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5 font-mono text-xs";
+        
+        let sevClass = "bg-amber-50 text-amber-700 border-amber-200";
+        if (f.severity === 'critical') sevClass = "bg-red-50 text-red-700 border-red-200";
+        else if (f.severity === 'error') sevClass = "bg-orange-50 text-orange-700 border-orange-200";
+
+        item.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-900">${escapeHtml(f.rule_name)}</span>
+            <span class="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded border ${sevClass}">${f.severity}</span>
+          </div>
+          <p class="text-slate-600 text-xs leading-relaxed font-sans">${escapeHtml(f.finding)}</p>
+          ${f.evidence ? `<div class="p-2 rounded bg-white border border-slate-200 text-slate-800 text-[11px]"><span class="text-slate-400">Match: </span><code>${escapeHtml(f.evidence)}</code></div>` : ''}
+          <div class="text-[11px] text-blue-700 bg-blue-50/60 p-2 rounded border border-blue-100">
+            <strong>Suggested Rule Fix: </strong>${escapeHtml(f.recommendation || '')}
+          </div>
+        `;
+        list.appendChild(item);
+      });
+      lucide.createIcons();
+    }
+
+    function renderAIDiagnosis(diag) {
+      document.getElementById('diag-root-cause').textContent = diag.probable_root_cause;
+      document.getElementById('diag-osi-layer').textContent = diag.case_id ? (loadedCases.find(c => c.case_id === diag.case_id)?.osi_layer || 'Layer 3 (Network)') : 'Layer 3 (Network)';
+      document.getElementById('diag-next-cmd').textContent = diag.recommended_next_command;
+      document.getElementById('diag-fix-code').textContent = diag.suggested_fix;
+
+      const confBadge = document.getElementById('diag-confidence-badge');
+      confBadge.textContent = `Confidence: ${diag.confidence_label} (${diag.confidence_score}%)`;
+
+      const sampleBadge = document.getElementById('diag-sample-badge');
+      sampleBadge.textContent = diag.source_status === 'sample' ? 'sample AI recommendation' : 'experiment AI recommendation';
+
+      const evidenceList = document.getElementById('diag-evidence-list');
+      evidenceList.innerHTML = '';
+      if (diag.evidence_quotes && diag.evidence_quotes.length > 0) {
+        diag.evidence_quotes.forEach(quote => {
+          const qDiv = document.createElement('div');
+          qDiv.className = "p-2 rounded bg-slate-50 border border-slate-200 text-slate-700 text-[11px]";
+          qDiv.innerHTML = `<code>${escapeHtml(quote)}</code>`;
+          evidenceList.appendChild(qDiv);
+        });
+        document.getElementById('diag-evidence-container').classList.remove('hidden');
+      } else {
+        document.getElementById('diag-evidence-container').classList.add('hidden');
+      }
+      lucide.createIcons();
+    }
+
+    // --- HUMAN REVIEW DECISION ---
+    function selectDecision(decision) {
+      selectedDecisionValue = decision;
+      const btnAcc = document.getElementById('btn-dec-accept');
+      const btnEdit = document.getElementById('btn-dec-edit');
+      const btnRej = document.getElementById('btn-dec-reject');
+      const editFields = document.getElementById('edit-fields-container');
+
+      btnAcc.className = "flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer " + (decision === 'accepted' ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm ring-2 ring-emerald-400/40' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50');
+      btnEdit.className = "flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer " + (decision === 'edited' ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-400/40' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50');
+      btnRej.className = "flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer " + (decision === 'rejected' ? 'bg-rose-600 text-white border-rose-700 shadow-sm ring-2 ring-rose-400/40' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50');
+
+      if (decision === 'edited') {
+        editFields.classList.remove('hidden');
+      } else {
+        editFields.classList.add('hidden');
+      }
+      document.getElementById('review-validation-error').classList.add('hidden');
+      lucide.createIcons();
+    }
+
+    async function handleSaveReview(e) {
+      e.preventDefault();
+      const errBox = document.getElementById('review-validation-error');
+      const errMsg = document.getElementById('review-validation-msg');
+      errBox.classList.add('hidden');
+
+      if (!currentDiagnosis) {
+        errMsg.textContent = 'Please generate an AI diagnosis before recording a review.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      if (!selectedDecisionValue) {
+        errMsg.textContent = 'Please select a decision: Accept Fix, Edit / Correct, or Reject Proposal.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      const reviewerNotes = document.getElementById('input-reviewer-notes').value.trim();
+      if (!reviewerNotes) {
+        errMsg.textContent = 'Reviewer Notes are mandatory to document your technical rationale.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      const correctedRootCause = document.getElementById('input-corrected-root-cause').value.trim();
+      const correctedFix = document.getElementById('input-corrected-fix').value.trim();
+
+      if (selectedDecisionValue === 'edited') {
+        if (!correctedRootCause) {
+          errMsg.textContent = 'Please provide the Corrected Root Cause when selecting Edit / Correct.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+        if (!correctedFix) {
+          errMsg.textContent = 'Please provide the Corrected Cisco IOS Script when selecting Edit / Correct.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+      }
+
+      const verificationStatus = document.getElementById('input-verification-status').value;
+      const reviewerName = document.getElementById('input-reviewer-name').value.trim() || 'Alex Chen (Lead NetOps)';
+
+      const payload = {
+        diagnosis_id: currentDiagnosis.id,
+        decision: selectedDecisionValue,
+        reviewer_note: reviewerNotes,
+        corrected_root_cause: selectedDecisionValue === 'edited' ? correctedRootCause : undefined,
+        corrected_fix: selectedDecisionValue === 'edited' ? correctedFix : undefined,
+        verification_status: verificationStatus,
+        reviewer_name: reviewerName
+      };
+
+      try {
+        const res = await fetch('/api/reviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.detail || 'Failed to submit review');
+        }
+
+        const revData = await res.json();
+
+        // Celebration confetti on verification or acceptance
+        if (verificationStatus === 'verified' || selectedDecisionValue === 'accepted') {
+          confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+        }
+
+        // Show Success Toast
+        const toast = document.getElementById('success-toast');
+        const toastMsg = document.getElementById('success-toast-msg');
+        toastMsg.innerHTML = `Decision <strong>${selectedDecisionValue.toUpperCase()}</strong> recorded successfully! Logged to Audit Report (<strong>#AUDIT-${String(revData.id).padStart(4, '0')}</strong>).`;
+        toast.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        setTimeout(() => toast.classList.add('hidden'), 6000);
+      } catch (err) {
+        errMsg.textContent = err.message;
+        errBox.classList.remove('hidden');
+      }
+    }
+
+    // --- DASHBOARD & ANALYTICS ---
+    async function loadDashboardStats() {
+      try {
+        const res = await fetch('/api/dashboard/summary');
+        if (!res.ok) throw new Error('Failed to load dashboard summary');
+        const data = await res.json();
+
+        // KPI Cards
+        document.getElementById('kpi-total-cases').textContent = data.total_cases;
+        document.getElementById('kpi-cases-sub').textContent = `${data.sample_cases_count} sample / ${data.experiment_cases_count} experiment`;
+        
+        document.getElementById('kpi-agreement-rate').textContent = `${data.human_agreement_rate}%`;
+        const totalReviews = data.accepted_count + data.edited_count + data.rejected_count;
+        document.getElementById('kpi-agreement-sub').textContent = `${data.accepted_count} accepted / ${totalReviews} reviews`;
+
+        document.getElementById('kpi-verified-fixes').textContent = data.verified_fixes;
+        document.getElementById('kpi-corrections-count').textContent = data.human_ai_corrections_count;
+
+        // Progress bars
+        const safeTotal = totalReviews || 1;
+        const accPct = Math.round((data.accepted_count / safeTotal) * 100);
+        const editPct = Math.round((data.edited_count / safeTotal) * 100);
+        const rejPct = Math.round((data.rejected_count / safeTotal) * 100);
+
+        document.getElementById('stat-accepted-val').textContent = `${data.accepted_count} (${accPct}%)`;
+        document.getElementById('bar-accepted').style.width = `${accPct}%`;
+
+        document.getElementById('stat-edited-val').textContent = `${data.edited_count} (${editPct}%)`;
+        document.getElementById('bar-edited').style.width = `${editPct}%`;
+
+        document.getElementById('stat-rejected-val').textContent = `${data.rejected_count} (${rejPct}%)`;
+        document.getElementById('bar-rejected').style.width = `${rejPct}%`;
+
+        document.getElementById('oversight-summary-text').textContent = `${data.human_ai_corrections_count} AI suggestions corrected by human reviewers in the live ledger.`;
+
+        // Render Chart.js Bar Chart
+        renderDomainChart(data.issue_type_counts || {});
+      } catch (err) {
+        console.error('Error loading dashboard stats:', err);
+      }
+    }
+
+    function renderDomainChart(domainCounts) {
+      const ctx = document.getElementById('domainChart');
+      if (!ctx) return;
+
+      const labels = Object.keys(domainCounts);
+      const data = Object.values(domainCounts);
+
+      if (domainChartInstance) {
+        domainChartInstance.destroy();
+      }
+
+      domainChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Lab Cases',
+            data: data,
+            backgroundColor: [
+              '#3b82f6', '#38bdf8', '#818cf8', '#ec4899', '#f59e0b', '#10b981', '#14b8a6', '#6366f1'
+            ],
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { stepSize: 1, color: '#64748b', font: { family: 'monospace', size: 11 } },
+              grid: { color: '#f1f5f9' }
+            },
+            x: {
+              ticks: { color: '#64748b', font: { family: 'monospace', size: 11 } },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    // --- AUDIT REPORT LOG ---
+    async function loadAuditLog() {
+      try {
+        const decision = document.getElementById('audit-decision-filter').value;
+        const search = document.getElementById('audit-search-input').value;
+
+        let url = `/api/audit-log?only_corrections=${filterOnlyCorrections}`;
+        if (decision && decision !== 'ALL') url += `&decision=${decision}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load audit log');
+        const items = await res.json();
+
+        const list = document.getElementById('audit-list');
+        const empty = document.getElementById('audit-empty-state');
+        list.innerHTML = '';
+
+        if (items.length === 0) {
+          empty.classList.remove('hidden');
+          return;
+        }
+        empty.classList.add('hidden');
+
+        items.forEach(event => {
+          const isExpanded = expandedAuditId === event.id;
+          const row = document.createElement('div');
+          row.className = `bg-white rounded-xl border font-mono text-xs transition-all shadow-xs ${event.is_ai_correction ? 'border-blue-300 bg-blue-50/20' : 'border-slate-200'}`;
+
+          let decBadge = "bg-emerald-50 text-emerald-800 border-emerald-200";
+          if (event.human_decision.toLowerCase() === 'edited') decBadge = "bg-blue-50 text-blue-800 border-blue-200";
+          else if (event.human_decision.toLowerCase() === 'rejected') decBadge = "bg-rose-50 text-rose-800 border-rose-200";
+
+          let verifBadge = "bg-slate-100 text-slate-700 border-slate-300";
+          if (event.verification_status === 'verified') verifBadge = "bg-emerald-100 text-emerald-800 border-emerald-300 font-bold";
+
+          row.innerHTML = `
+            <div onclick="toggleAuditExpand('${event.id}')" class="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/80">
+              <div class="flex flex-wrap items-center gap-3">
+                <span class="font-bold text-slate-400 text-[11px]">${event.id}</span>
+                <button onclick="event.stopPropagation(); loadCaseIntoWorkbench('${event.case_id}')" class="font-bold text-blue-600 hover:underline flex items-center gap-1">
+                  ${escapeHtml(event.case_id)}
+                  <i data-lucide="external-link" class="w-3 h-3 text-slate-400"></i>
+                </button>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">${escapeHtml(event.issue_type)}</span>
+                <span class="text-slate-800 font-semibold">${escapeHtml(event.case_title)}</span>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2.5">
+                ${event.is_ai_correction ? '<span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 text-[10px] font-bold">AI CORRECTED</span>' : ''}
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${decBadge}">${event.human_decision}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] border ${verifBadge}">${event.verification_status}</span>
+                <span class="text-slate-400 text-[11px] whitespace-nowrap">${formatDate(event.timestamp)}</span>
+                <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-slate-400"></i>
+              </div>
+            </div>
+
+            ${isExpanded ? `
+              <div class="p-4 border-t border-slate-100 bg-slate-50/70 space-y-4">
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="text-slate-600 font-semibold uppercase">Reviewer Audit Notes:</span>
+                    <span class="text-slate-500">By: ${escapeHtml(event.reviewer)}</span>
+                  </div>
+                  <p class="p-3 rounded-lg bg-white border border-slate-200 text-slate-800 leading-relaxed font-sans text-xs">
+                    ${escapeHtml(event.reviewer_note)}
+                  </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="space-y-1">
+                    <span class="text-slate-600 font-semibold text-[11px] flex items-center gap-1">
+                      <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-600"></i>
+                      AI Suggested Diagnosis & Fix:
+                    </span>
+                    <div class="p-3 rounded-lg bg-white border border-slate-200 space-y-2 text-[11px]">
+                      <p class="text-slate-700 font-sans"><strong>Root Cause: </strong>${escapeHtml(event.ai_root_cause)}</p>
+                      <pre class="text-slate-700 bg-slate-100 p-2 rounded overflow-x-auto whitespace-pre font-mono text-[11px]">${escapeHtml(event.ai_suggested_fix)}</pre>
+                    </div>
+                  </div>
+
+                  <div class="space-y-1">
+                    <span class="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
+                      <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                      Final Approved / Corrected Fix:
+                    </span>
+                    <div class="p-3 rounded-lg bg-white border border-slate-200 space-y-2 text-[11px]">
+                      ${event.corrected_root_cause ? `<p class="text-amber-800 font-sans"><strong>Corrected Root Cause: </strong>${escapeHtml(event.corrected_root_cause)}</p>` : ''}
+                      <pre class="text-emerald-800 bg-emerald-50/60 p-2 rounded border border-emerald-200 overflow-x-auto whitespace-pre font-mono text-[11px]">${escapeHtml(event.final_applied_fix)}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          `;
+          list.appendChild(row);
+        });
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Error loading audit log:', err);
+      }
+    }
+
+    function toggleAuditExpand(auditId) {
+      expandedAuditId = expandedAuditId === auditId ? null : auditId;
+      loadAuditLog();
+    }
+
+    function toggleFilterCorrections() {
+      filterOnlyCorrections = !filterOnlyCorrections;
+      const btn = document.getElementById('btn-toggle-corrections');
+      btn.textContent = filterOnlyCorrections ? 'Show All Records' : 'Filter AI Corrections';
+      btn.className = `text-xs font-semibold px-2.5 py-1 rounded transition-colors shadow-xs cursor-pointer ${filterOnlyCorrections ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`;
+      loadAuditLog();
+    }
+
+    function handleAuditFilterChange() {
+      loadAuditLog();
+    }
+
+    function loadCaseIntoWorkbench(caseId) {
+      switchView('workbench');
+      const select = document.getElementById('preloader-select');
+      select.value = caseId;
+      handleLoadCase(caseId);
+    }
+
+    // --- CSV IMPORT MODAL ACTIONS ---
+    function openImportModal() {
+      document.getElementById('import-modal').classList.remove('hidden');
+      document.getElementById('import-feedback').className = 'hidden p-3 rounded-lg text-xs';
+      document.getElementById('csv-file-input').value = '';
+      document.getElementById('csv-text-input').value = '';
+    }
+
+    function closeImportModal() {
+      document.getElementById('import-modal').classList.add('hidden');
+    }
+
+    async function handleExecuteImport() {
+      const fileInput = document.getElementById('csv-file-input');
+      const textInput = document.getElementById('csv-text-input').value;
+      const feedback = document.getElementById('import-feedback');
+
+      const formData = new FormData();
+      if (fileInput.files.length > 0) {
+        formData.append('file', fileInput.files[0]);
+      } else if (textInput.trim()) {
+        formData.append('raw_csv', textInput.trim());
+      } else {
+        feedback.className = 'p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs block';
+        feedback.textContent = 'Please select a CSV file or paste CSV text.';
+        return;
+      }
+
+      feedback.className = 'p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs block';
+      feedback.textContent = 'Uploading and validating CSV dataset...';
+
+      try {
+        const res = await fetch('/api/cases/import-csv', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'CSV Import failed');
+        }
+
+        feedback.className = 'p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs block';
+        let msg = `Successfully imported ${data.imported_count} cases as 'experiment' status!`;
+        if (data.failed_count > 0) {
+          msg += ` (${data.failed_count} rows failed validation).`;
+        }
+        feedback.textContent = msg;
+
+        // Reload cases and dashboard stats
+        await loadCasesList();
+        await loadDashboardStats();
+
+        setTimeout(() => closeImportModal(), 2000);
+      } catch (err) {
+        feedback.className = 'p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs block';
+        feedback.textContent = err.message;
+      }
+    }
+
+    async function handleResetDefaults() {
+      if (!confirm('Reset local database to initial 30 real lab cases and 5 Responsible AI audit records?')) return;
+      try {
+        await fetch('/api/admin/reset-db', { method: 'POST' });
+        await loadCasesList();
+        await loadDashboardStats();
+        if (currentView === 'analytics') {
+          await loadAuditLog();
+        }
+        alert('Database successfully reset to 30 real lab cases and audited records!');
+      } catch (err) {
+        window.location.reload();
+      }
+    }
+
+    // --- HELPERS ---
+    function showLoading(show, label = 'Processing...') {
+      const spinner = document.getElementById('loading-spinner');
+      const spinnerLabel = document.getElementById('loading-label');
+      spinnerLabel.textContent = label;
+      if (show) spinner.classList.remove('hidden');
+      else spinner.classList.add('hidden');
+    }
+
+    function copyToClipboard(text, btnId) {
+      navigator.clipboard.writeText(text);
+      const btn = document.getElementById(btnId);
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="text-emerald-600 font-bold text-[10px]">Copied!</span>';
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        lucide.createIcons();
+      }, 2000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatDate(isoStr) {
+      if (!isoStr) return '';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+               d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      } catch {
+        return isoStr;
+      }
+    }
+  </script>
+</body>
+</html>

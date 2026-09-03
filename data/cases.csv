@@ -1,0 +1,296 @@
+case_id,issue_type,topology_note,symptom,show_outputs,expected_fault,osi_layer,concept,severity,expected_next_command,expected_fix
+CASE-01,VLAN,"PC1(VLAN5, Fa0/5) -> SW1 -> R1(router-on-a-stick, Gi0/0.5 and Gi0/0.10 sub-interfaces) -> Server1(VLAN10, Fa0/10); SW1-R1 uplink on SW1 Gi0/1",PC1 (VLAN5) cannot communicate with Server1 (VLAN10) via router R1; loading Server1's web page at 10.10.10.1 from PC1's browser fails.,"SW1#show vlan brief
+5   VLAN0005  active  Fa0/5, Gig0/1
+10  VLAN0010  active  Fa0/10
+
+SW1#show interfaces gigabitEthernet 0/1 switchport
+Administrative Mode: static access
+Operational Mode: static access
+Access Mode VLAN: 5 (VLAN0005)","SW1's switch-to-router uplink (Gi0/1) was configured as an access port in VLAN5 instead of trunk mode, blocking VLAN10 traffic from reaching R1 and breaking inter-VLAN routing",Layer 2,VLAN/Trunking (Uplink in Access Mode),High,SW1# show interfaces trunk,"SW1(config)# interface gigabitEthernet 0/1
+SW1(config-if)# switchport mode trunk
+SW1(config-if)# end"
+CASE-02,Gateway,"PC1(192.168.1.10) -> SW1 -> R1(Fa0/0, 192.168.1.1; Loopback0, 172.16.1.1 simulating a remote network) -> Server1(192.168.1.20)","PC1 (192.168.1.10) can reach devices on its own subnet fine, but cannot reach a remote network (172.16.1.1) reachable only via the default gateway.","C:\>ping 172.16.1.1
+Request timed out. (x4)
+Ping statistics: Sent = 4, Received = 0, Lost = 4 (100% loss)
+
+C:\>ipconfig
+IPv4 Address: 192.168.1.10
+Subnet Mask: 255.255.255.0
+Default Gateway: 192.168.1.99","PC1's default gateway was manually misconfigured to 192.168.1.99 instead of the router's real interface IP 192.168.1.1, blocking all off-subnet traffic while same-subnet traffic remained unaffected",Layer 3,Gateway misconfiguration,Medium,ipconfig /all,Configure PC1 Default Gateway to 192.168.1.1
+CASE-03,DHCP,"PC2(DHCP client) -> SW1 -> R1(DHCP server, pool LANPOOL, excluded 192.168.1.1-192.168.1.9); PC1 and Server1 unaffected (static IPs)","PC2, configured for DHCP, fails to obtain an IP address (ipconfig /renew returns 'DHCP request failed'); previously worked fine.","C:\>ipconfig /renew
+DHCP request failed.
+
+R1#show running-config | section dhcp
+ip dhcp pool LANPOOL
+ network 192.168.1.0 255.255.255.252
+ default-router 192.168.1.1
+
+R1#show ip dhcp binding
+IP address        Client-ID/Hardware address   Lease expiration   Type
+192.168.1.11       0001.4284.BBC9               --                 Automatic","DHCP pool's network statement was shrunk to a /30, leaving no usable addresses to lease (combined with the existing exclusion range), causing new/renewing clients to fail lease acquisition despite the DHCP service itself still running",Layer 7,DHCP pool exhaustion (/30 scope),High,R1# show ip dhcp pool,"R1(config)# ip dhcp pool LANPOOL
+R1(dhcp-config)# network 192.168.1.0 255.255.255.0
+R1(dhcp-config)# end"
+CASE-04,ACL,"PC1(192.168.1.10) -> SW1 -> R1(Fa0/0 192.168.1.1, inbound ACL 101; Loopback0 172.16.1.1) -> Server1(192.168.1.20)","PC1 can reach Server1 normally, but ping to 172.16.1.1 (a remote-simulated host behind R1) returns 'Destination host unreachable'; previously worked fine.","C:\>ping 172.16.1.1
+Reply from 192.168.1.1: Destination host unreachable. (x4)
+Ping statistics: Sent = 4, Received = 0, Lost = 4 (100% loss)
+
+R1#show access-lists
+Extended IP access list 101
+ 10 deny icmp any host 172.16.1.1 (4 match(es))
+ 20 permit ip any any","An extended ACL (101) applied inbound on R1's Fa0/0 explicitly denied ICMP traffic to 172.16.1.1, blocking ping to that specific host while leaving all other traffic unaffected",Layer 4,ACL misconfiguration (Explicit ICMP Deny),High,R1# show access-lists 101,"R1(config)# ip access-list extended 101
+R1(config-ext-nacl)# no 10
+R1(config-ext-nacl)# end"
+CASE-05,NAT,"PC1(192.168.1.10) -> SW1 -> R1(Fa0/0 inside, Fa0/1 outside 172.16.2.2, NAT pool 172.16.1.50-.60 overload, ACL 1 for NAT source matching) -> R2(Fa0/0, 172.16.2.1)","PC1 cannot reach a remote network (172.16.2.1, beyond a second router R2) despite NAT being configured on R1; previously worked fine.","C:\>ping 172.16.2.1
+Request timed out. (x4)
+Ping statistics: Sent = 4, Received = 0, Lost = 4 (100% loss)
+
+R1#show access-lists 1
+Standard IP access list 1
+    10 permit 192.168.2.0, wildcard bits 0.0.0.255
+
+R1#show ip nat translations
+(empty -- no translation entries created)","The standard ACL (1) used by the ip nat inside source rule was changed to match the wrong subnet (192.168.2.0/24 instead of 192.168.1.0/24), so PC1's traffic no longer qualified for NAT translation",Layer 3,NAT misconfiguration (ACL subnet mismatch),High,R1# show ip nat statistics,"R1(config)# access-list 1 permit 192.168.1.0 0.0.0.255
+R1(config)# no access-list 1 permit 192.168.2.0 0.0.0.255"
+CASE-06,Routing,"PC1(192.168.1.10) -> SW1 -> R1(Fa0/1 172.16.2.2) -> R2(Fa0/0 172.16.2.1, Fa0/1 172.16.3.1) -> PC3(172.16.3.10)",PC1 cannot reach PC3 (172.16.3.10) behind R2; ping returns 'Destination host unreachable' from R1 itself.,"C:\>ping 172.16.3.10
+Reply from 192.168.1.1: Destination host unreachable. (x2)
+Request timed out. (x2)
+
+R1#show ip route
+172.16.0.0/16 is variably subnetted, 2 subnets, 2 masks
+C  172.16.1.1/32 is directly connected, Loopback0
+C  172.16.2.0/24 is directly connected, FastEthernet0/1
+C  192.168.1.0/24 is directly connected, FastEthernet0/0
+(no entry for 172.16.3.0/24)","R1 had no static or dynamic route configured to reach the 172.16.3.0/24 subnet behind R2, so all traffic to that network was dropped at R1 with a 'destination unreachable' response",Layer 3,Missing route (Static route absent),High,R1# show ip route,R1(config)# ip route 172.16.3.0 255.255.255.0 172.16.2.1
+CASE-07,DNS,"PC1(192.168.1.10, DNS client) -> SW1 -> R1 -> Server1(192.168.1.20, running DNS service with A record www.testsite.com -> 192.168.1.20)","PC1 can no longer resolve www.testsite.com by name ('could not find host'), though the server itself remains reachable by IP.","C:\>ping www.testsite.com
+Ping request could not find host www.testsite.com. Please check the name and try again.
+
+C:\>ping 192.168.1.20
+Reply from 192.168.1.20: bytes=32 time<1ms TTL=128 (x4)
+
+C:\>ipconfig /all
+IPv4 Address: 192.168.1.10
+Subnet Mask: 255.255.255.0
+Default Gateway: 192.168.1.1
+DNS Servers: 192.168.1.199","PC1's configured DNS server address was changed to a nonexistent IP (192.168.1.199), so name resolution for www.testsite.com failed entirely while direct IP connectivity remained fully functional",Layer 7,DNS misconfiguration (Wrong DNS server IP on client),Medium,ipconfig /all,Configure PC1 DNS Server IP to 192.168.1.20
+CASE-08,NAT,"PC1(192.168.1.10) -> SW1 -> R1(Fa0/0 inside, Fa0/1 outside 172.16.2.2, NAT pool NATPOOL 172.16.1.50-.60, ACL 1 matching 192.168.1.0/24) -> R2(Fa0/0, 172.16.2.1)","PC1 cannot reach 172.16.2.1 (beyond R2), and no NAT translations occur, despite the NAT pool and ACL both still being correctly configured; previously worked fine.","C:\>ping 172.16.2.1
+Request timed out. (x4)
+Ping statistics: Sent = 4, Received = 0, Lost = 4 (100% loss)
+
+R1#show running-config | section nat
+ip nat pool NATPOOL 172.16.1.50 172.16.1.60 netmask 255.255.255.0
+interface FastEthernet0/0
+ ip nat inside
+interface FastEthernet0/1
+ ip nat outside
+(missing 'ip nat inside source list 1 pool NATPOOL overload')
+
+R1#show ip nat translations
+(empty)","The ip nat inside source list 1 pool NATPOOL overload command binding the ACL to the NAT pool was removed, so no NAT translation rule was in effect",Layer 3,NAT misconfiguration (missing translation binding rule),High,R1# show ip nat statistics,R1(config)# ip nat inside source list 1 pool NATPOOL overload
+CASE-09,Interface,PC1 -> SW1(FastEthernet0/1) -> LAN device(192.168.1.10); SW1 FastEthernet0/1 is the PC1 access port.,PC1 cannot communicate with the device at 192.168.1.10; ping returns 'Request timed out' because its switch access port is disabled.,"C:\>ping 192.168.1.10
+Request timed out. (x4)
+Ping statistics: Sent = 4, Received = 0, Lost = 4 (100% loss)
+
+Switch#show interface fastEthernet 0/1 status
+Port      Name               Status       Vlan       Duplex  Speed Type
+Fa0/1                        disabled     1          auto    auto  10/100BaseTX","Switch interface FastEthernet0/1 was administratively shut down (disabled), causing the connected device to lose network connectivity",Layer 1,Interface administratively down (port shutdown),Medium,Switch# show interface Fa0/1 status,"Switch(config)# interface FastEthernet0/1
+Switch(config-if)# no shutdown
+Switch(config-if)# end"
+CASE-10,VLAN,"PC1(192.168.1.10) -> Switch(Fa0/1, access VLAN10) -> Switch(Fa1/1, access VLAN10) -> PC2(192.168.1.20); both PCs must remain in VLAN10",PC1 (192.168.1.10) cannot communicate with PC2 (192.168.1.20) after PC1's switch access port is assigned to the wrong VLAN; ping returns 'Request timed out.',"Switch#show vlan brief
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    
+10   VLAN0010                         active    Fa1/1
+20   VLAN0020                         active    Fa0/1
+
+C:\>ping 192.168.1.20
+Request timed out. (x4)","Switch interface Fa0/1 (PC1's port) was assigned to VLAN20 instead of VLAN10, placing PC1 and PC2 in different broadcast domains despite sharing the same IP subnet",Layer 2,"Wrong VLAN assignment (host-to-host, same subnet)",Medium,Switch# show vlan brief,"Switch(config)# interface FastEthernet0/1
+Switch(config-if)# switchport access vlan 10
+Switch(config-if)# end"
+CASE-11,VLAN,"PC1(192.168.1.10) -> Switch(FastEthernet0/1, access VLAN10) -> Switch(FastEthernet1/1, access VLAN10) -> PC2(192.168.1.20)",PC1 (192.168.1.10) cannot communicate with PC2 (192.168.1.20) after VLAN10 is deleted from the switch; ping returns 'Request timed out' even though both PCs retain their IP addresses.,"Switch#show vlan brief
+(VLAN 10 is absent from the VLAN database)
+
+Switch#show interfaces fastEthernet 0/1 switchport
+Access Mode VLAN: 10 (Inactive)
+
+C:\>ping 192.168.1.20
+Request timed out. (x4)",VLAN10 was deleted while the PC switch ports were still configured as access ports in VLAN10. The switch therefore marked FastEthernet0/1's assigned VLAN as inactive,Layer 2,Missing VLAN (VLAN database absent),High,Switch# show vlan brief,"Switch(config)# vlan 10
+Switch(config-vlan)# name VLAN0010
+Switch(config-vlan)# state active
+Switch(config-vlan)# end"
+CASE-12,IP/Subnet,"PC1(192.168.1.10) -> Switch(FastEthernet0/1, VLAN10) -> Switch(FastEthernet1/1, VLAN10) -> PC2(192.168.1.20); both PCs on 192.168.1.0/24",PC1 (192.168.1.10) cannot communicate with PC2 (192.168.1.20) after PC1's subnet mask is changed incorrectly to 255.255.255.252; ping returns 'Request timed out.',"C:\>ipconfig
+IPv4 Address: 192.168.1.10
+Subnet Mask: 255.255.255.252
+Default Gateway: 192.168.1.1
+
+C:\>ping 192.168.1.20
+Request timed out. (x4)
+Ping statistics: Sent = 4, Received = 0, Lost = 4 (100% loss)","PC1's subnet mask was incorrectly changed to 255.255.255.252 (/30). This mask placed 192.168.1.20 outside PC1's perceived local subnet, preventing direct communication",Layer 3,Subnet mask misconfiguration (/30 on host),Medium,ipconfig,Configure PC1 Subnet Mask to 255.255.255.0 (/24)
+CASE-13,IP/Subnet,"PC1(192.168.1.10) -> Switch(FastEthernet0/1, VLAN10) -> Switch(FastEthernet1/1, VLAN10) -> PC2(192.168.1.20)",PC1 cannot communicate with PC2 (192.168.1.20) after PC1's static IP address is changed from 192.168.1.10 to 192.168.2.10; ping returns 'Request timed out.',"C:\>ipconfig
+IPv4 Address: 192.168.2.10
+Subnet Mask: 255.255.255.0
+Default Gateway: 192.168.1.1
+
+C:\>ping 192.168.1.20
+Request timed out. (x4)","PC1's static IPv4 address was assigned to the wrong network, 192.168.2.0/24, while PC2 remained in 192.168.1.0/24 without a router path",Layer 3,Wrong static IP address (disparate subnet),Medium,ipconfig,Configure PC1 IP address to 192.168.1.10 /24
+CASE-14,Interface,"PC1(192.168.1.10) -> SW1(VLAN10) -> R1(Fa0/0 192.168.1.1, Fa0/1 172.16.2.2) -> R2(Fa0/0 172.16.2.1, Fa0/1 172.16.3.1) -> PC3(172.16.3.10)",PC1 (192.168.1.10) cannot reach remote PC3 (172.16.3.10); ping returns 'Destination host unreachable' from R1 after the R1-to-R2 interface is shut down.,"R1#show ip interface brief
+FastEthernet0/0    192.168.1.1    up                     up
+FastEthernet0/1    172.16.2.2     administratively down  down
+
+C:\>ping 172.16.3.10
+Reply from 192.168.1.1: Destination host unreachable. (x4)","R1 FastEthernet0/1, the routed link from R1 to R2, was administratively shut down, dropping all routed traffic to 172.16.3.0/24",Layer 1,Router interface shutdown (Transit link admin down),High,R1# show ip interface brief,"R1(config)# interface FastEthernet0/1
+R1(config-if)# no shutdown
+R1(config-if)# end"
+CASE-15,DHCP,"PC2(DHCP client) -> SW1(VLAN10) -> R1(Fa0/0 192.168.1.1, DHCP server with pool LANPOOL) -> R2 -> PC3(172.16.3.10)","PC2, configured as a DHCP client, loses its IP configuration and cannot renew an address; `ipconfig /renew` returns 'DHCP request failed.'","C:\>ipconfig /renew
+DHCP request failed.
+
+R1#show running-config | include dhcp
+no service dhcp
+ip dhcp pool LANPOOL
+ network 192.168.1.0 255.255.255.0","The DHCP service on R1 was disabled with the 'no service dhcp' command, preventing R1 from responding to DHCP Discover/Request messages",Layer 7,DHCP service disabled (no service dhcp),High,R1# show running-config | include dhcp,"R1(config)# service dhcp
+R1(config)# end"
+CASE-16,DHCP,"PC2(DHCP client) -> SW1(VLAN10) -> R1(Fa0/0 192.168.1.1, DHCP pool LANPOOL) -> R2 -> PC3(172.16.3.10); Server1(192.168.1.20) is local","PC2 receives a valid DHCP address but cannot reach remote PC3 (172.16.3.10), while same-subnet Server1 (192.168.1.20) remains reachable.","C:\>ipconfig
+IPv4 Address: 192.168.1.11
+Subnet Mask: 255.255.255.0
+Default Gateway: 192.168.1.254
+
+R1#show running-config | section dhcp
+ip dhcp pool LANPOOL
+ network 192.168.1.0 255.255.255.0
+ default-router 192.168.1.254
+
+C:\>ping 172.16.3.10
+Request timed out. (x4)","The DHCP pool on R1 distributed the incorrect default gateway, 192.168.1.254, to PC2 instead of 192.168.1.1",Layer 7,Incorrect DHCP default gateway option,Medium,R1# show running-config | section dhcp,"R1(config)# ip dhcp pool LANPOOL
+R1(dhcp-config)# default-router 192.168.1.1
+R1(dhcp-config)# end"
+CASE-17,DNS,"PC2(DHCP address 192.168.1.11, DNS server 192.168.1.20) -> SW1(VLAN10) -> Server1(192.168.1.20, DNS service)","PC2 cannot resolve www.testsite.com by name, but Server1 remains reachable directly at 192.168.1.20.","C:\>ping www.testsite.com
+Could not find host www.testsite.com
+
+C:\>ping 192.168.1.20
+Reply from 192.168.1.20: bytes=32 time<1ms TTL=128 (x4)
+(Server1 DNS record list empty for www.testsite.com)","The DNS A record for www.testsite.com was removed from Server1, while IP connectivity remained fully operational",Layer 7,Missing DNS record (A record deleted),Medium,nslookup www.testsite.com 192.168.1.20,Add DNS A Record on Server1: www.testsite.com -> 192.168.1.20
+CASE-18,ACL,"PC1(192.168.1.10) and PC2(192.168.1.11) -> SW1(VLAN10) -> R1(Fa0/0, inbound ACL 110) -> R2 -> PC3(172.16.3.10)","PC2 (192.168.1.11) cannot reach remote PC3 (172.16.3.10), while PC1 can still reach the same remote host.","PC2> ping 172.16.3.10
+Reply from 192.168.1.1: Destination host unreachable. (x4)
+
+PC1> ping 172.16.3.10
+Reply from 172.16.3.10: bytes=32 time<1ms TTL=126 (x4)
+
+R1#show access-lists
+Extended IP access list 110
+ 10 deny icmp host 192.168.1.11 host 172.16.3.10 (4 match(es))
+ 20 permit ip any any",ACL 110 on R1 explicitly denied ICMP traffic from PC2 (192.168.1.11) to PC3 (172.16.3.10) while permitting all other traffic,Layer 4,ACL misconfiguration (Host-specific deny rule),Medium,R1# show access-lists 110,"R1(config)# interface FastEthernet0/0
+R1(config-if)# no ip access-group 110 in
+R1(config)# no access-list 110"
+CASE-19,DHCP,"PC2(DHCP client) -> SW1(VLAN10) -> R1(DHCP pool LANPOOL) -> Server1(192.168.1.20, DNS service)",PC2 receives a valid DHCP address and default gateway but cannot resolve www.testsite.com by name.,"C:\>ipconfig /all
+IPv4 Address: 192.168.1.11
+Subnet Mask: 255.255.255.0
+Default Gateway: 192.168.1.1
+DNS Servers: 192.168.1.254
+
+R1#show running-config | section dhcp
+ip dhcp pool LANPOOL
+ dns-server 192.168.1.254","R1's DHCP pool distributed an incorrect DNS server address, 192.168.1.254, to PC2 instead of 192.168.1.20",Layer 7,DHCP distributes wrong DNS server option,Medium,R1# show running-config | section dhcp,"R1(config)# ip dhcp pool LANPOOL
+R1(dhcp-config)# dns-server 192.168.1.20
+R1(dhcp-config)# end"
+CASE-20,NAT,"PC2(192.168.1.11) -> SW1(VLAN10) -> R1(Fa0/0 inside, Fa0/1 outside 172.16.2.2) -> R2 -> PC3(172.16.3.10)",Internal PC2 cannot reach remote PC3 (172.16.3.10) after NAT inside/outside roles are reversed on R1; ping returns 'Request timed out.',"R1#show ip nat statistics
+Outside Interfaces: (none)
+Inside Interfaces: FastEthernet0/1
+Total translations: 0
+
+R1#show running-config interface FastEthernet0/0
+interface FastEthernet0/0
+ (missing 'ip nat inside')
+
+C:\>ping 172.16.3.10
+Request timed out. (x4)","R1's NAT roles were reversed: the LAN interface FastEthernet0/0 was not marked as inside, while the WAN interface FastEthernet0/1 was incorrectly marked as inside",Layer 3,NAT inside/outside interface role reversal,High,R1# show ip nat statistics,"R1(config)# interface FastEthernet0/0
+R1(config-if)# ip nat inside
+R1(config)# interface FastEthernet0/1
+R1(config-if)# no ip nat inside
+R1(config-if)# ip nat outside"
+CASE-21,ACL,"PC1(192.168.1.10) and PC2(192.168.1.11) -> SW1(VLAN10) -> R1(Fa0/0, inbound ACL 120) -> R2 -> PC3(172.16.3.10)","Both PC1 and PC2 cannot reach remote PC3 (172.16.3.10) after an ACL is applied on R1, even though only one deny statement was intentionally configured.","R1#show access-lists
+Extended IP access list 120
+ 10 deny icmp host 192.168.1.11 host 172.16.3.10 (4 match(es))
+(no permit statement configured)
+
+PC1> ping 172.16.3.10
+Reply from 192.168.1.1: Destination host unreachable. (x4)","ACL 120 contained only a deny statement and no permit rule. Cisco ACLs have an implicit deny all at the end, so all remaining traffic was dropped",Layer 4,ACL implicit deny (missing permit any),High,R1# show access-lists 120,"R1(config)# ip access-list extended 120
+R1(config-ext-nacl)# permit ip any any
+R1(config-ext-nacl)# end"
+CASE-22,Routing,PC2(192.168.1.11) -> SW1(VLAN10) -> R1(Fa0/1 172.16.2.2) -> R2(Fa0/0 172.16.2.1) -> PC3(172.16.3.10),PC2 cannot reach remote PC3 (172.16.3.10) after R1's static route is configured with an incorrect next-hop address.,"R1#show ip route
+S 172.16.3.0/24 [1/0] via 172.16.2.254
+
+PC2> ping 172.16.3.10
+Request timed out. (x4)",R1's static route to the remote 172.16.3.0/24 network used nonexistent next hop 172.16.2.254 instead of R2 at 172.16.2.1,Layer 3,Static route with wrong next hop (unreachable gateway),High,R1# show ip route,"R1(config)# no ip route 172.16.3.0 255.255.255.0 172.16.2.254
+R1(config)# ip route 172.16.3.0 255.255.255.0 172.16.2.1"
+CASE-23,NAT,"PC2(192.168.1.11) -> SW1(VLAN10) -> R1(NAT inside Fa0/0, outside Fa0/1; ACL 1 identifies inside source traffic) -> R2 -> PC3(172.16.3.10)",PC2 cannot reach remote PC3 (172.16.3.10) because its source subnet no longer matches the ACL used by R1 NAT.,"R1#show access-lists 1
+Standard IP access list 1
+ 10 permit 192.168.2.0, wildcard bits 0.0.0.255
+
+R1#show ip nat translations
+(empty -- PC2 192.168.1.11 traffic does not match ACL 1)
+
+PC2> ping 172.16.3.10
+Request timed out. (x4)","The standard ACL used by the R1 NAT rule was changed to match 192.168.2.0/24 instead of the actual LAN subnet 192.168.1.0/24, failing translation",Layer 3,NAT ACL source-match misconfiguration,High,R1# show access-lists 1,"R1(config)# access-list 1 permit 192.168.1.0 0.0.0.255
+R1(config)# no access-list 1 permit 192.168.2.0 0.0.0.255"
+CASE-24,DNS,"PC2(DHCP DNS server 192.168.1.20) -> SW1(VLAN10) -> Server1(192.168.1.20, DNS service with www.testsite.com A record)","PC2 cannot resolve www.testsite.com by name when Server1's DNS service is disabled, but Server1 remains reachable by IP address.","C:\>ping www.testsite.com
+Could not find host www.testsite.com
+
+C:\>ping 192.168.1.20
+Reply from 192.168.1.20: bytes=32 time<1ms TTL=128 (x4)
+(Server1 DNS service state: Disabled)","Server1's DNS service was turned OFF/disabled, preventing name resolution despite healthy IP layer connectivity",Layer 7,DNS service disabled (Service Off),Medium,nslookup www.testsite.com,Turn ON DNS Service in Server1 Services configuration
+CASE-25,Gateway,"PC0(192.168.10.10) -> Switch0 -> Router1(G0/0 192.168.10.1, G0/1 192.168.20.1) -> Server0(192.168.20.10)",PC0 (192.168.10.10) can reach its local router interface (192.168.10.1) but cannot reach remote Server0 (192.168.20.10).,"PC0> ping 192.168.10.1
+Reply from 192.168.10.1: bytes=32 time<1ms (x4)
+
+PC0> ping 192.168.20.10
+Request timed out. (x4)
+
+PC0> ipconfig
+IPv4 Address: 192.168.10.10
+Subnet Mask: 255.255.255.0
+Default Gateway: 192.168.10.254","PC0 had an incorrect default gateway (192.168.10.254) instead of Router1 G0/0 IP (192.168.10.1), preventing cross-subnet forwarding",Layer 3,Default gateway misconfiguration (Wrong gateway IP on client),Medium,ipconfig,Configure PC0 Default Gateway to 192.168.10.1
+CASE-26,Interface,"PC0(192.168.10.10) -> Switch0 -> Router1(G0/0 192.168.10.1, G0/1 192.168.20.1) -> Server0(192.168.20.10)",PC0 cannot reach Server0 because Router1's interface toward the server network is administratively down.,"Router1#show ip interface brief
+GigabitEthernet0/0    192.168.10.1    up                     up
+GigabitEthernet0/1    192.168.20.1    administratively down  down
+
+PC0> ping 192.168.20.10
+Reply from 192.168.10.1: Destination host unreachable. (x4)","Router1 G0/1, the interface connecting to Server0's network, was administratively shut down",Layer 1,Router interface shutdown (Server interface down),High,Router1# show ip interface brief,"Router1(config)# interface GigabitEthernet0/1
+Router1(config-if)# no shutdown
+Router1(config-if)# end"
+CASE-27,Gateway,"PC0(192.168.10.10) -> Switch0 -> Router1(G0/0 192.168.10.1, G0/1 192.168.20.1) -> Server0(192.168.20.10)",PC0 cannot reach Server0 even though Server0 can reach its local router interface.,"Server0> ping 192.168.20.1
+Reply from 192.168.20.1: bytes=32 (x4), 0% loss
+
+PC0> ping 192.168.20.10
+Request timed out. (x4)
+
+Server0> ipconfig
+IPv4 Address: 192.168.20.10
+Subnet Mask: 255.255.255.0
+Default Gateway: 192.168.20.254","Server0 had an incorrect default gateway (192.168.20.254 instead of 192.168.20.1), preventing it from returning packets to remote PC0",Layer 3,Server default gateway misconfiguration,Medium,ipconfig,Configure Server0 Default Gateway to 192.168.20.1
+CASE-28,VLAN,"PC0(192.168.10.10, Switch0 Fa0/1) -> Switch0 -> PC1(192.168.10.20, Switch0 Fa0/3); both hosts must be in VLAN10",PC0 cannot ping PC1 even though both devices use addresses in the 192.168.10.0/24 network.,"Switch0#show vlan brief
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+10   VLAN0010                         active    Fa0/1
+20   VLAN0020                         active    Fa0/3
+
+PC0> ping 192.168.10.20
+Request timed out. (x4)","PC1's switch access port Fa0/3 was assigned to VLAN20 while PC0 was in VLAN10, isolating them in different broadcast domains",Layer 2,Wrong access VLAN assignment,Medium,Switch0# show vlan brief,"Switch0(config)# interface FastEthernet0/3
+Switch0(config-if)# switchport access vlan 10
+Switch0(config-if)# end"
+CASE-29,VLAN,"PC0(192.168.10.10, Switch0 Fa0/1) -> Switch0 -> PC1(192.168.10.20, Switch0 Fa0/3); both ports require VLAN10",PC0 cannot ping PC1 after the VLAN required by both access ports is deleted from Switch0.,"Switch0#show vlan brief
+(VLAN 10 is absent from the database)
+
+Switch0#show interfaces fastEthernet 0/1 switchport
+Access Mode VLAN: 10 (Inactive)
+
+PC0> ping 192.168.10.20
+Request timed out. (x4)","VLAN10 was deleted from Switch0 while PC0 and PC1 access ports depended on it, making both ports inactive",Layer 2,Missing VLAN (deleted VLAN database),Medium,Switch0# show vlan brief,"Switch0(config)# vlan 10
+Switch0(config-vlan)# name VLAN0010
+Switch0(config-vlan)# state active
+Switch0(config-vlan)# end"
+CASE-30,Interface,"PC2(192.168.1.11) -> SW1(VLAN10) -> R1 -> R2(Fa0/0 172.16.2.1, Fa0/1 172.16.3.1) -> PC3(172.16.3.10)",PC2 cannot reach remote PC3 (172.16.3.10) after R2's interface toward the PC3 network is administratively shut down.,"R2#show ip interface brief
+FastEthernet0/0    172.16.2.1    up                     up
+FastEthernet0/1    172.16.3.1    administratively down  down
+
+PC2> ping 172.16.3.10
+Reply from 172.16.2.1: Destination host unreachable. (x4)","R2 FastEthernet0/1, the routed interface connecting to PC3's 172.16.3.0/24 network, was administratively shut down",Layer 1,Router interface shutdown,High,R2# show ip interface brief,"R2(config)# interface FastEthernet0/1
+R2(config-if)# no shutdown
+R2(config-if)# end"
